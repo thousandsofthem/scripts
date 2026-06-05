@@ -222,22 +222,26 @@ ping_target() {
   awk '/packets transmitted/ || /round-trip/ || /rtt / || /min\/avg\/max/ { print }' "$tmp"
 
   loss="$(sed -n 's/.* \([0-9][0-9.]*\)% packet loss.*/\1/p' "$tmp" | tail -n 1)"
-  avg="$(awk -F'[=/ ]+' '
+  avg="$(awk '
     /round-trip/ || /rtt / {
-      for (i=1; i<=NF; i++) {
-        if ($i == "min") {
-          print $(i+2)
-          exit
-        }
+      metrics=$0
+      sub(/^.*= */, "", metrics)
+      sub(/ .*/, "", metrics)
+      split(metrics, values, "/")
+      if (values[2] ~ /^[0-9.]+$/) {
+        print values[2]
+        exit
       }
     }' "$tmp")"
-  max="$(awk -F'[=/ ]+' '
+  max="$(awk '
     /round-trip/ || /rtt / {
-      for (i=1; i<=NF; i++) {
-        if ($i == "min") {
-          print $(i+3)
-          exit
-        }
+      metrics=$0
+      sub(/^.*= */, "", metrics)
+      sub(/ .*/, "", metrics)
+      split(metrics, values, "/")
+      if (values[3] ~ /^[0-9.]+$/) {
+        print values[3]
+        exit
       }
     }' "$tmp")"
 
@@ -362,9 +366,9 @@ http_check() {
 
   awk -v total="${total:-0}" 'BEGIN { exit !(total > 5) }' && penalize 12 "very slow HTTP total time for ${url}: ${total}s"
   awk -v total="${total:-0}" 'BEGIN { exit !(total > 2 && total <= 5) }' && penalize 5 "elevated HTTP total time for ${url}: ${total}s"
-  awk -v st="${starttransfer:-0}" 'BEGIN { exit !(st > 2) }' && penalize 5 "slow time to first byte for ${url}: ${st}s"
-  awk -v conn="${connect:-0}" 'BEGIN { exit !(conn > 1) }' && penalize 5 "slow TCP connect for ${url}: ${conn}s"
-  awk -v dns="${namelookup:-0}" 'BEGIN { exit !(dns > 0.5) }' && penalize 5 "slow curl DNS phase for ${url}: ${dns}s"
+  awk -v st="${starttransfer:-0}" 'BEGIN { exit !(st > 2) }' && penalize 5 "slow time to first byte for ${url}: ${starttransfer}s"
+  awk -v conn="${connect:-0}" 'BEGIN { exit !(conn > 1) }' && penalize 5 "slow TCP connect for ${url}: ${connect}s"
+  awk -v dns="${namelookup:-0}" 'BEGIN { exit !(dns > 0.5) }' && penalize 5 "slow curl DNS phase for ${url}: ${namelookup}s"
   awk -v tls="${tls:-0}" 'BEGIN { exit !(tls > 1.5) }' && penalize 4 "slow TLS handshake for ${url}: ${tls}s"
 }
 
